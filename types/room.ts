@@ -6,6 +6,7 @@ export interface DBFile {
     language: string;
     code: string;
     created_at: string;
+    type?: "file" | "folder";
 }
 
 export interface File {
@@ -38,6 +39,8 @@ export interface RoomEditorProps {
         email?: string;
         user_metadata?: {
             avatar_url?: string;
+            full_name?: string;
+            name?: string;
             editor_settings?: {
                 fontSize?: number;
                 minimap?: boolean;

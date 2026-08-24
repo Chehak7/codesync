@@ -40,7 +40,7 @@ interface Version {
     user_id: string;
     user: {
         id: string;
-        email?: string;
+        display_name?: string;
         avatar_url?: string;
     };
 }
@@ -102,7 +102,7 @@ export function VersionHistorySidebar({
             message: message,
             created_at: new Date().toISOString(),
             user_id: "optimistic",
-            user: { id: "optimistic", email: "Me" }
+            user: { id: "optimistic", display_name: "Me" }
         } as Version;
         setVersions(prev => [tempVersion, ...prev]);
 
@@ -124,9 +124,12 @@ export function VersionHistorySidebar({
         if (!confirm) return;
 
         const result = await restoreFileVersion(roomId, activeFileId, version.id);
-        if (result.error) {
+        if (result.error || !result.data) {
             toast.error(result.error);
         } else {
+            window.dispatchEvent(new CustomEvent("code-editor:replace-content", {
+                detail: { code: result.data.code },
+            }));
             toast.success("File restored");
             onOpenChange(false);
         }
@@ -146,7 +149,7 @@ export function VersionHistorySidebar({
 
     const filteredVersions = versions.filter(v =>
         v.message?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        v.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+        v.user?.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
@@ -215,13 +218,13 @@ export function VersionHistorySidebar({
                                             <Avatar className="h-8 w-8">
                                                 <AvatarImage src={version.user?.avatar_url} />
                                                 <AvatarFallback>
-                                                    {version.user?.email?.slice(0, 2).toUpperCase() || "U"}
+                                                    {version.user?.display_name?.slice(0, 2).toUpperCase() || "U"}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <span className="text-xs font-semibold truncate">
-                                                        {version.user?.email || "Anonymous"}
+                                                        {version.user?.display_name || "Anonymous"}
                                                     </span>
                                                     <span className="text-[10px] text-muted-foreground">
                                                         {formatDistanceToNow(new Date(version.created_at), { addSuffix: true })}

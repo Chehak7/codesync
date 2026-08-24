@@ -6,13 +6,16 @@ import { SideBar } from './SideBar';
 import { EditorArea } from './EditorArea';
 import { Panel } from './Panel';
 import { TitleBar } from './TitleBar';
-import { AlertCircle, Settings } from 'lucide-react';
+import { AlertCircle, Cloud, CloudOff, RefreshCw, Settings } from 'lucide-react';
 import { FileNode } from '@/types/file-system';
 import { UserRole } from '@/actions/permissions-actions';
 import { Message } from '@/types/room';
 import { AIAssistantProvider } from '../ai/AIAssistant';
 import { AIChatPanel } from '../ai/AIChatPanel';
 import { SnippetPanel } from '../snippets/SnippetPanel';
+import type { Awareness } from 'y-protocols/awareness';
+import type * as Y from 'yjs';
+import type { CollaborationParticipant, CollaborationState } from '@/hooks/use-room-collaboration';
 
 interface VSCodeLayoutProps {
     roomId: string;
@@ -29,9 +32,13 @@ interface VSCodeLayoutProps {
         isDirty?: boolean;
     }>;
     activeFileId: string | null;
+    activeText: Y.Text | null;
+    awareness: Awareness;
     onFileSelect: (file: FileNode) => void;
-    onFileChange: (value: string | undefined) => void;
     onTabClose: (fileId: string) => void;
+    collaborationState: CollaborationState;
+    collaborationError?: string | null;
+    participants: CollaborationParticipant[];
 
     // Editor settings
     fontSize?: number;
@@ -50,9 +57,13 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
     currentUserRole,
     openFiles,
     activeFileId,
+    activeText,
+    awareness,
     onFileSelect,
-    onFileChange,
     onTabClose,
+    collaborationState,
+    collaborationError,
+    participants,
     fontSize = 14,
     minimap = true,
     lineNumbers = 'on',
@@ -140,9 +151,10 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
                                 }
                             }}
                             onTabClose={onTabClose}
-                            code={activeFile?.code || ''}
+                            yText={activeText}
+                            awareness={awareness}
                             language={activeFile?.language || 'plaintext'}
-                            onChange={onFileChange}
+                            collaborationError={collaborationError}
                             readOnly={readOnly}
                             fontSize={fontSize}
                             minimap={minimap}
@@ -172,6 +184,22 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
                     </div>
                     <div className="flex-1" />
                     <div className="flex items-center gap-8">
+                        <span
+                            className="flex items-center gap-2 normal-case tracking-normal font-semibold"
+                            data-testid="collaboration-status"
+                            data-state={collaborationState}
+                            title={collaborationError || undefined}
+                        >
+                            {collaborationState === 'saved' ? (
+                                <Cloud className="h-3.5 w-3.5 text-emerald-400" />
+                            ) : collaborationState === 'auth-error' || collaborationState === 'save-error' ? (
+                                <CloudOff className="h-3.5 w-3.5 text-neon-pink" />
+                            ) : (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin text-neon-cyan" />
+                            )}
+                            <span>{statusLabel(collaborationState)}</span>
+                            <span className="text-white/30">· {participants.length} online</span>
+                        </span>
                         <span className="hover:text-neon-cyan transition-all cursor-pointer">Ln 1, Col 1</span>
                         <span className="hover:text-neon-cyan transition-all cursor-pointer">UTF-8</span>
                         <span className="text-neon-cyan drop-shadow-[0_0_10px_rgba(6,182,212,0.5)] font-bold">{activeFile?.language || 'Plain Text'}</span>
@@ -196,3 +224,15 @@ export const VSCodeLayout: React.FC<VSCodeLayoutProps> = ({
         </AIAssistantProvider>
     );
 };
+
+function statusLabel(state: CollaborationState): string {
+    switch (state) {
+        case 'connecting': return 'Connecting';
+        case 'reconnecting': return 'Reconnecting — local edits buffered';
+        case 'syncing': return 'Syncing';
+        case 'saving': return 'Saving';
+        case 'saved': return 'Saved';
+        case 'save-error': return 'Not saved — retrying';
+        case 'auth-error': return 'Collaboration unavailable';
+    }
+}

@@ -4,6 +4,8 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CodeEditor } from '@/components/editor/CodeEditor';
+import type { Awareness } from 'y-protocols/awareness';
+import type * as Y from 'yjs';
 
 interface EditorTab {
     id: string;
@@ -17,9 +19,10 @@ interface EditorAreaProps {
     activeTabId: string | null;
     onTabChange: (tabId: string) => void;
     onTabClose: (tabId: string) => void;
-    code: string;
+    yText: Y.Text | null;
+    awareness: Awareness;
     language: string;
-    onChange: (value: string | undefined) => void;
+    collaborationError?: string | null;
     readOnly?: boolean;
     fontSize?: number;
     minimap?: boolean;
@@ -31,9 +34,10 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
     activeTabId,
     onTabChange,
     onTabClose,
-    code,
+    yText,
+    awareness,
     language,
-    onChange,
+    collaborationError,
     readOnly = false,
     fontSize = 14,
     minimap = true,
@@ -96,16 +100,21 @@ export const EditorArea: React.FC<EditorAreaProps> = ({
 
             {/* Editor Content */}
             <div className="flex-1 overflow-hidden bg-neon-void relative">
-                {activeTabId ? (
+                {activeTabId && yText ? (
                     <CodeEditor
-                        code={code}
+                        key={activeTabId}
+                        yText={yText}
+                        awareness={awareness}
                         language={language}
-                        onChange={onChange}
                         readOnly={readOnly}
                         fontSize={fontSize}
                         minimap={minimap}
                         lineNumbers={lineNumbers}
                     />
+                ) : activeTabId ? (
+                    <div className="flex h-full items-center justify-center text-sm text-white/50">
+                        {collaborationError || 'Loading collaborative document…'}
+                    </div>
                 ) : (
                     <div className="flex items-center justify-center h-full">
                         <div className="text-center space-y-6 opacity-20">

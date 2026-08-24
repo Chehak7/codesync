@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "collaboration",
+    "outDir": "dist-collaboration",
+    "noEmit": false,
+    "isolatedModules": false,
+    "incremental": false,
+    "types": ["node"]
+  },
+  "include": ["collaboration/**/*.mts"],
+  "exclude": ["node_modules"]
+}

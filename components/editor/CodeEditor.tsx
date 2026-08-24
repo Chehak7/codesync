@@ -2,15 +2,18 @@
 
 import { useEffect, useState, useRef } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
+import { MonacoBinding } from "y-monaco";
+import type { Awareness } from "y-protocols/awareness";
+import type * as Y from "yjs";
 import { InlineSuggestion } from "../ai/InlineSuggestion";
 
 // Loader config if needed (e.g. from CDN)
 // Loader.config({ paths: { vs: "..." } }); 
 
 interface CodeEditorProps {
-    code: string;
+    yText: Y.Text;
+    awareness: Awareness;
     language: string;
-    onChange: (value: string) => void;
     theme?: string;
     readOnly?: boolean;
     fontSize?: number;
@@ -20,9 +23,9 @@ interface CodeEditorProps {
 }
 
 export function CodeEditor({
-    code,
+    yText,
+    awareness,
     language,
-    onChange,
     readOnly = false,
     fontSize = 14,
     minimap = true,
@@ -31,7 +34,9 @@ export function CodeEditor({
 }: CodeEditorProps) {
     const [editorTheme, setEditorTheme] = useState("codesync-dark");
     const editorRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const bindingRef = useRef<MonacoBinding | null>(null);
     const [monaco, setMonaco] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const [observableContent, setObservableContent] = useState(() => yText.toString());
 
     const handleEditorWillMount = (monaco: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         monaco.editor.defineTheme('codesync-dark', {
@@ -72,21 +77,32 @@ export function CodeEditor({
     const handleEditorDidMount: OnMount = (editor, monaco) => {
         editorRef.current = editor;
         setMonaco(monaco);
+        const model = editor.getModel();
+        if (model) {
+            bindingRef.current?.destroy();
+            bindingRef.current = new MonacoBinding(yText, model, new Set([editor]), awareness);
+        }
         if (onMount) {
             onMount(editor, monaco);
         }
     };
 
-    const handleEditorChange = (value: string | undefined) => {
-        if (value !== undefined) {
-            onChange(value);
-        }
-    };
+    useEffect(() => {
+        const updateContent = () => setObservableContent(yText.toString());
+        yText.observe(updateContent);
+        updateContent();
+        return () => yText.unobserve(updateContent);
+    }, [yText]);
+
+    useEffect(() => () => {
+        bindingRef.current?.destroy();
+        bindingRef.current = null;
+    }, []);
 
     useEffect(() => {
         const handleInsertSnippet = (e: Event) => {
             const customEvent = e as CustomEvent<{ code: string }>;
-            if (editorRef.current) {
+            if (!readOnly && editorRef.current) {
                 const contribution = editorRef.current.getContribution("snippetController2");
                 if (contribution) {
                     contribution.insert(customEvent.detail.code);
@@ -95,9 +111,29 @@ export function CodeEditor({
             }
         };
 
+        const handleReplaceContent = (e: Event) => {
+            if (readOnly) return;
+            const customEvent = e as CustomEvent<{ code: string }>;
+            const editor = editorRef.current;
+            const model = editor?.getModel();
+            if (!editor || !model || typeof customEvent.detail?.code !== "string") return;
+            editor.pushUndoStop();
+            editor.executeEdits("version-restore", [{
+                range: model.getFullModelRange(),
+                text: customEvent.detail.code,
+                forceMoveMarkers: true,
+            }]);
+            editor.pushUndoStop();
+            editor.focus();
+        };
+
         window.addEventListener("code-editor:insert-snippet", handleInsertSnippet);
-        return () => window.removeEventListener("code-editor:insert-snippet", handleInsertSnippet);
-    }, []);
+        window.addEventListener("code-editor:replace-content", handleReplaceContent);
+        return () => {
+            window.removeEventListener("code-editor:insert-snippet", handleInsertSnippet);
+            window.removeEventListener("code-editor:replace-content", handleReplaceContent);
+        };
+    }, [readOnly]);
 
     // Register Snippet Completions
     useEffect(() => {
@@ -132,15 +168,22 @@ export function CodeEditor({
 
     return (
         <div className="h-full w-full overflow-hidden">
-            {editorRef.current && monaco && (
+            <output
+                className="sr-only"
+                aria-hidden="true"
+                data-testid="editor-content"
+                data-content={observableContent}
+            >
+                {observableContent}
+            </output>
+            {!readOnly && editorRef.current && monaco && (
                 <InlineSuggestion editor={editorRef.current} monaco={monaco} />
             )}
             <Editor
                 height="100%"
                 language={language.toLowerCase()} // Monaco languages are lowercase
-                value={code}
+                defaultValue={yText.toString()}
                 theme={editorTheme}
-                onChange={handleEditorChange}
                 onMount={handleEditorDidMount}
                 beforeMount={handleEditorWillMount}
                 options={{

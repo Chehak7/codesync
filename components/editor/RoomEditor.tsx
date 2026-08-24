@@ -1,16 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { VSCodeLayout } from "@/components/layout/VSCodeLayout";
 import { FileNode } from "@/types/file-system";
-import { toast } from "sonner";
-import { useDebouncedCallback } from "use-debounce";
-import { saveFileContent } from "@/actions/file-actions";
 import { UserRole } from "@/actions/permissions-actions";
 import { OnboardingTour } from "@/components/onboarding-tour";
 import { InviteDialog } from "@/components/permissions/InviteDialog";
 import { ImportFilesDialog } from "./ImportFilesDialog";
 import { DBFile, File, RoomEditorProps } from "@/types/room";
+import { useRoomCollaboration } from "@/hooks/use-room-collaboration";
 
 
 
@@ -23,10 +21,10 @@ export function RoomEditor({
     userRole: initialUserRole,
     roomCode
 }: RoomEditorProps) {
-    const [files, setFiles] = useState<File[]>(initialFiles.map((f: DBFile) => ({
+    const [files, setFiles] = useState<File[]>(initialFiles.filter((f) => f.type !== "folder").map((f: DBFile) => ({
         id: f.id,
         name: f.name,
-        language: f.language,
+        language: f.language || "plaintext",
         code: f.code,
         isDirty: false,
     })));
@@ -38,6 +36,19 @@ export function RoomEditor({
     const [userRole] = useState<UserRole>(initialUserRole);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const isReadOnly = userRole === "viewer";
+    const displayName =
+        currentUser.user_metadata?.full_name ||
+        currentUser.user_metadata?.name ||
+        "Collaborator";
+
+    const collaboration = useRoomCollaboration({
+        roomId,
+        userId: currentUser.id,
+        displayName,
+        activeFileId,
+        canWrite: !isReadOnly,
+    });
 
     // Editor settings
     const [fontSize] = useState(
@@ -50,34 +61,31 @@ export function RoomEditor({
         currentUser.user_metadata?.editor_settings?.lineNumbers || "on"
     );
 
-    const handleCodeChange = (value: string | undefined) => {
-        if (!activeFileId || !value) return;
+    const openFileIds = useMemo(() => files.map((file) => file.id).join(","), [files]);
 
-        setFiles(prev => prev.map(f =>
-            f.id === activeFileId ? { ...f, code: value, isDirty: true } : f
-        ));
-
-        debouncedSave(activeFileId, value);
-    };
-
-    const debouncedSave = useDebouncedCallback(async (fileId: string, content: string) => {
-        try {
-            const result = await saveFileContent(fileId, content, roomId);
-            if (result.error) {
-                toast.error(result.error);
-            }
-        } catch {
-            toast.error("An unexpected error occurred during save");
-        } finally {
-            // Mark as saved
-            setFiles(prev => prev.map(f =>
-                f.id === fileId ? { ...f, isDirty: false } : f
-            ));
-        }
-    }, 1000);
+    useEffect(() => {
+        const ids = openFileIds.split(",").filter(Boolean);
+        const observers = ids.map((id) => {
+            const text = collaboration.getText(id);
+            const updateFile = () => {
+                const code = text.toString();
+                setFiles((current) => current.map((file) =>
+                    file.id === id && file.code !== code ? { ...file, code } : file
+                ));
+            };
+            text.observe(updateFile);
+            updateFile();
+            return { text, updateFile };
+        });
+        return () => {
+            for (const { text, updateFile } of observers) text.unobserve(updateFile);
+        };
+    }, [collaboration.getText, openFileIds]);
 
     const handleFileSelect = (file: FileNode) => {
+        if (file.type === "folder") return;
         setActiveFileId(file.id);
+        collaboration.requestFile(file.id);
 
         // Add to open files if not already open
         if (!files.find(f => f.id === file.id)) {
@@ -110,7 +118,10 @@ export function RoomEditor({
         });
     };
 
-    const isReadOnly = userRole === "viewer";
+    const visibleFiles = files.map((file) => ({
+        ...file,
+        isDirty: collaboration.hasUnsavedChanges,
+    }));
 
     return (
         <>
@@ -119,11 +130,15 @@ export function RoomEditor({
                 roomName={roomName}
                 currentUserId={currentUser.id}
                 currentUserRole={userRole}
-                openFiles={files}
+                openFiles={visibleFiles}
                 activeFileId={activeFileId}
+                activeText={collaboration.activeText}
+                awareness={collaboration.awareness}
                 onFileSelect={handleFileSelect}
-                onFileChange={handleCodeChange}
                 onTabClose={handleTabClose}
+                collaborationState={collaboration.state}
+                collaborationError={collaboration.error}
+                participants={collaboration.participants}
                 fontSize={fontSize}
                 minimap={minimap}
                 lineNumbers={lineNumbers}

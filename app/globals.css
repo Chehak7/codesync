@@ -107,3 +107,16 @@
 .animate-swirl {
   animation: swirl 20s linear infinite;
 }
+
+/* y-monaco uses these decorations for remote selections and carets. */
+.yRemoteSelection {
+  background-color: rgba(6, 182, 212, 0.28);
+}
+
+.yRemoteSelectionHead {
+  border-left-color: #06b6d4;
+  border-left-width: 2px;
+  border-left-style: solid;
+  box-sizing: border-box;
+  position: relative;
+}

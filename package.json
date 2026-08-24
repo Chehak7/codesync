@@ -3,11 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "concurrently --kill-others-on-fail -n next,collaboration -c cyan,magenta \"npm:dev:next\" \"npm:dev:collaboration:optional\"",
+    "dev:next": "next dev",
+    "dev:collaboration": "node --env-file-if-exists=.env.local --import tsx collaboration/server.mts",
+    "dev:collaboration:optional": "node --env-file-if-exists=.env.local --import tsx scripts/dev-collaboration.mjs",
+    "build": "next build && npm run build:collaboration",
+    "build:collaboration": "tsc -p tsconfig.collaboration.json",
     "start": "next start",
+    "start:collaboration": "node --env-file-if-exists=.env.local dist-collaboration/server.mjs",
     "lint": "eslint app components lib --ext .ts,.tsx",
-    "test:rls": "node supabase/tests/rls.test.mjs"
+    "test:rls": "node supabase/tests/rls.test.mjs",
+    "test:e2e": "node --env-file-if-exists=.env.local node_modules/@playwright/test/cli.js test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.118.0",
@@ -45,7 +51,9 @@
     "emoji-picker-react": "^4.16.1",
     "framer-motion": "^12.26.2",
     "jszip": "^3.10.1",
+    "lib0": "^0.2.117",
     "lucide-react": "^0.562.0",
+    "monaco-editor": "^0.52.2",
     "next": "^16.3.1",
     "next-themes": "^0.4.6",
     "prettier": "^3.7.4",
@@ -67,13 +75,16 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^20.19.29",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "concurrently": "^9.2.1",
     "eslint": "9.39.5",
     "eslint-config-next": "^16.3.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   },
   "overrides": {
