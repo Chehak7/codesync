@@ -3,18 +3,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { nanoid } from "nanoid";
-
-// We'll use a custom nanoid or just random string since 'nanoid' package import might vary in server components.
-// Actually, simple random string is enough for room codes.
-function generateRoomCode() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 6; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
 
 export async function createRoom(formData: FormData) {
     const supabase = await createClient();
@@ -28,35 +16,15 @@ export async function createRoom(formData: FormData) {
         return { error: "You must be logged in to create a room." };
     }
 
-    const roomCode = generateRoomCode();
-
     const { data: room, error } = await supabase
-        .from("rooms")
-        .insert({
-            name,
-            room_code: roomCode,
-            owner_id: user.id,
-            is_public: isPublic,
+        .rpc("create_room", {
+            p_name: name,
+            p_is_public: isPublic,
         })
-        .select()
         .single();
 
     if (error) {
         return { error: error.message };
-    }
-
-    // Add owner to room_members
-    const { error: memberError } = await supabase
-        .from("room_members")
-        .insert({
-            room_id: room.id,
-            user_id: user.id,
-            role: "owner"
-        });
-
-    if (memberError) {
-        // Rollback? Ideally yes, but for now just report. RLS should allow this.
-        console.error("Failed to add owner member:", memberError);
     }
 
     revalidatePath("/rooms");
@@ -73,43 +41,59 @@ export async function joinRoom(rawCode: string) {
         return { error: "You must be logged in to join a room." };
     }
 
-    // Find room by code using RPC to bypass RLS for non-members
-    const { data: rooms, error: roomError } = await supabase
-        .rpc("find_room_by_code", { p_code: code });
-
-    if (roomError || !rooms || rooms.length === 0) {
-        return { error: "Room not found or invalid code." };
-    }
-
-    const roomId = rooms[0].id;
-
-    // Check if already a member
-    const { data: member } = await supabase
-        .from("room_members")
-        .select("id")
-        .eq("room_id", roomId)
-        .eq("user_id", user.id)
-        .maybeSingle(); // Use maybeSingle for better error handling
-
-    if (member) {
-        // Already joined, just redirect
-        redirect(`/room/${roomId}`);
-    }
-
-    const { error: joinError } = await supabase
-        .from("room_members")
-        .insert({
-            room_id: roomId,
-            user_id: user.id,
-            role: "editor"
+    const { data: roomId, error } = await supabase
+        .rpc("join_room", {
+            p_code: code,
+            p_room_id: undefined,
+            p_invitation_token: undefined,
         });
 
-    if (joinError) {
-        return { error: joinError.message };
+    if (error || !roomId) {
+        return { error: error?.message || "Room not found or invalid code." };
     }
 
     revalidatePath("/rooms");
     redirect(`/room/${roomId}`);
+}
+
+export async function joinPublicRoom(roomId: string) {
+    const supabase = await createClient();
+    const { data: userData } = await supabase.auth.getUser();
+
+    if (!userData?.user) {
+        return { error: "You must be logged in to join a room." };
+    }
+
+    const { data: joinedRoomId, error } = await supabase
+        .rpc("join_public_room", { p_room_id: roomId });
+
+    if (error || !joinedRoomId) {
+        return { error: "This room is not public or no longer exists." };
+    }
+
+    revalidatePath("/rooms");
+    redirect(`/room/${joinedRoomId}`);
+}
+
+export async function createRoomInvite(roomId: string, role: "editor" | "viewer") {
+    if (role !== "editor" && role !== "viewer") {
+        return { error: "Invitation role must be editor or viewer." };
+    }
+
+    const supabase = await createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) return { error: "Unauthorized" };
+
+    const { data: token, error } = await supabase.rpc("create_room_invitation", {
+        p_room_id: roomId,
+        p_role: role,
+    });
+
+    if (error || !token) {
+        return { error: error?.message || "Unable to create invitation." };
+    }
+
+    return { data: { token } };
 }
 
 export async function leaveRoom(roomId: string) {
@@ -119,11 +103,7 @@ export async function leaveRoom(roomId: string) {
 
     if (!user) return { error: "Unauthorized" };
 
-    const { error } = await supabase
-        .from("room_members")
-        .delete()
-        .eq("room_id", roomId)
-        .eq("user_id", user.id);
+    const { error } = await supabase.rpc("leave_room", { p_room_id: roomId });
 
     if (error) {
         return { error: error.message };

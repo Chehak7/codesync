@@ -37,12 +37,17 @@ export async function signup(formData: FormData) {
         const data = {
             email: formData.get('email') as string,
             password: formData.get('password') as string,
+            fullName: formData.get('fullName') as string,
         }
 
         const { error } = await supabase.auth.signUp({
-            ...data,
+            email: data.email,
+            password: data.password,
             options: {
                 emailRedirectTo: `${origin}/auth/callback`,
+                data: {
+                    full_name: data.fullName,
+                },
             },
         })
 

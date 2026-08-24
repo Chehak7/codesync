@@ -14,7 +14,7 @@ export interface RoomWithRole {
     is_public: boolean;
     owner_id: string;
     created_at: string;
-    role?: "owner" | "member"; // if user is a member
+    role?: "owner" | "editor" | "viewer";
     participant_count: number;
 }
 
@@ -87,6 +87,7 @@ export function RoomList({ myRooms, publicRooms, userId }: RoomListProps) {
                                     key={room.id}
                                     room={room}
                                     currentUserId={userId}
+                                    memberRole={room.role}
                                     participantCount={room.participant_count}
                                 />
                             ))}
@@ -108,6 +109,7 @@ export function RoomList({ myRooms, publicRooms, userId }: RoomListProps) {
                                     key={room.id}
                                     room={room}
                                     currentUserId={userId}
+                                    memberRole={room.role}
                                     participantCount={room.participant_count}
                                 />
                             ))}

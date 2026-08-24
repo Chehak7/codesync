@@ -77,7 +77,7 @@ export const Features: React.FC = () => {
                             <div className="absolute top-0 right-0 w-32 h-32 bg-neon-cyan/5 blur-[60px] group-hover:bg-neon-cyan/10 transition-colors" />
 
                             <div className="mb-8 w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center text-white/20 group-hover:text-neon-cyan group-hover:scale-110 transition-all duration-500 shadow-inner group-hover:shadow-[0_0_20px_rgba(6,182,212,0.2)]">
-                                {React.cloneElement(feature.icon as React.ReactElement, { className: "w-10 h-10" })}
+                                {React.cloneElement(feature.icon as React.ReactElement<{ className?: string }>, { className: "w-10 h-10" })}
                             </div>
                             <h3 className="text-3xl font-black text-white mb-4 tracking-tight">
                                 {feature.title}

@@ -23,6 +23,18 @@ export async function createFileVersion(
         return { error: "Insufficient permissions to create versions" };
     }
 
+    const { data: file, error: fileError } = await supabase
+        .from("code_sessions")
+        .select("id")
+        .eq("id", fileId)
+        .eq("room_id", roomId)
+        .eq("type", "file")
+        .maybeSingle();
+
+    if (fileError || !file) {
+        return { error: fileError?.message || "File not found in this room" };
+    }
+
     const { data, error } = await supabase
         .from("code_versions")
         .insert({
@@ -49,7 +61,7 @@ export async function fetchFileVersions(fileId: string) {
         .from("code_versions")
         .select(`
             *,
-            user:profiles(id, email, avatar_url)
+            user:profiles(id, display_name, avatar_url)
         `)
         .eq("code_session_id", fileId)
         .order("created_at", { ascending: false });
@@ -73,29 +85,33 @@ export async function restoreFileVersion(
         return { error: "Insufficient permissions to restore versions" };
     }
 
-    // Get version content
     const { data: version, error: fetchError } = await supabase
         .from("code_versions")
         .select("code")
         .eq("id", versionId)
+        .eq("room_id", roomId)
+        .eq("code_session_id", fileId)
         .single();
 
     if (fetchError || !version) {
         return { error: fetchError?.message || "Version not found" };
     }
 
-    // Update main file
-    const { error: updateError } = await supabase
+    const { data: updatedFile, error: updateError } = await supabase
         .from("code_sessions")
         .update({ code: version.code })
-        .eq("id", fileId);
+        .eq("id", fileId)
+        .eq("room_id", roomId)
+        .eq("type", "file")
+        .select("id")
+        .maybeSingle();
 
-    if (updateError) {
-        return { error: updateError.message };
+    if (updateError || !updatedFile) {
+        return { error: updateError?.message || "File not found in this room" };
     }
 
     revalidatePath(`/room/${roomId}`);
-    return { success: true };
+    return { success: true, data: { code: version.code } };
 }
 
 export async function deleteVersion(roomId: string, versionId: string) {
@@ -109,7 +125,8 @@ export async function deleteVersion(roomId: string, versionId: string) {
     const { error } = await supabase
         .from("code_versions")
         .delete()
-        .eq("id", versionId);
+        .eq("id", versionId)
+        .eq("room_id", roomId);
 
     if (error) {
         return { error: error.message };

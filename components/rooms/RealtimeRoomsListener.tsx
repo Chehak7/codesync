@@ -2,10 +2,10 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 export function RealtimeRoomsListener() {
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const router = useRouter();
 
     useEffect(() => {

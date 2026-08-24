@@ -114,7 +114,7 @@ export async function fetchMessages(roomId: string, limit: number = 50, offset: 
         .from("messages")
         .select(`
             *,
-            user:profiles(id, email, avatar_url)
+            user:profiles(id, display_name, avatar_url)
         `)
         .eq("room_id", roomId)
         .is("deleted_at", null)

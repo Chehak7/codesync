@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -19,6 +21,7 @@
 
 # production
 /build
+/dist-collaboration/
 
 # misc
 .DS_Store
@@ -31,6 +34,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -46,5 +50,4 @@ supabase/deep_debug_*.sql
 supabase/verify_*.sql
 supabase/disable_trigger_ver2.sql
 supabase/MANUAL_SETUP.md
-
 

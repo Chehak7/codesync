@@ -33,10 +33,11 @@ export function AIAssistantProvider({ children }: { children: ReactNode }) {
             const { getAICompletion } = await import("@/app/actions/ai");
             const result = await getAICompletion(content, context);
 
-            if (result.content) {
-                setMessages((prev) => [...prev, { role: "assistant", content: result.content }]);
+            const assistantContent = result.content;
+            if (assistantContent) {
+                setMessages((prev) => [...prev, { role: "assistant", content: assistantContent }]);
                 // Mock token calculation for now
-                setTokenUsage((prev) => prev + content.length / 4 + result.content.length / 4);
+                setTokenUsage((prev) => prev + content.length / 4 + assistantContent.length / 4);
             } else {
                 throw new Error(result.error);
             }

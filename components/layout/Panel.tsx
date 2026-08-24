@@ -4,9 +4,8 @@ import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { AlertCircle, ChevronDown, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { TerminalManager } from '../terminal/TerminalManager';
 
-type PanelTab = 'terminal' | 'output' | 'problems';
+type PanelTab = 'output' | 'problems';
 
 interface PanelProps {
     isOpen: boolean;
@@ -21,13 +20,12 @@ export const Panel: React.FC<PanelProps> = ({
     height = 200,
     onHeightChange,
 }) => {
-    const [activeTab, setActiveTab] = useState<PanelTab>('terminal');
+    const [activeTab, setActiveTab] = useState<PanelTab>('output');
     const [isResizing, setIsResizing] = useState(false);
 
     const tabs: Array<{ id: PanelTab; label: string }> = [
         { id: 'problems', label: 'PROBLEMS' },
         { id: 'output', label: 'OUTPUT' },
-        { id: 'terminal', label: 'TERMINAL' },
     ];
 
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -121,9 +119,6 @@ export const Panel: React.FC<PanelProps> = ({
 
             {/* Panel Content */}
             <div className="flex-1 overflow-hidden bg-neon-void/40">
-                {activeTab === 'terminal' && (
-                    <TerminalManager />
-                )}
                 {activeTab === 'output' && (
                     <ScrollArea className="h-full p-6">
                         <div className="font-mono text-sm space-y-2">

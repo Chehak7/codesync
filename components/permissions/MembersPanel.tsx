@@ -24,8 +24,9 @@ import {
 import { RoleBadge } from "./RoleBadge";
 import { UserRole, getRoomMembers, updateMemberRole, removeMember } from "@/actions/permissions-actions";
 import { toast } from "sonner";
-import { UserMinus } from "lucide-react";
+import { UserMinus, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { InviteDialog } from "./InviteDialog";
 
 interface Member {
     id: string;
@@ -34,7 +35,7 @@ interface Member {
     joined_at: string;
     user: {
         id: string;
-        email?: string;
+        display_name?: string;
         avatar_url?: string;
     };
 }
@@ -55,6 +56,7 @@ export function MembersPanel({
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState(true);
     const [memberToRemove, setMemberToRemove] = useState<Member | null>(null);
+    const [inviteOpen, setInviteOpen] = useState(false);
 
     const isOwner = currentUserRole === "owner";
 
@@ -130,10 +132,20 @@ export function MembersPanel({
         <div className="h-full flex flex-col bg-transparent">
             <div className="p-8 border-b border-white/5 space-y-2 bg-white/[0.02] backdrop-blur-xl relative">
                 <div className="absolute inset-x-0 bottom-0 h-[1px] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-                <h2 className="text-[10px] font-bold uppercase tracking-[0.4em] text-black flex items-center justify-between">
-                    Collaborators
-                    <span className="px-2 py-0.5 rounded-full bg-black/5 text-black/40 text-[8px] font-black">{members.length}</span>
-                </h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-[10px] font-bold uppercase tracking-[0.4em] text-black">
+                        Collaborators
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-black/5 text-black/40 text-[8px] font-black">{members.length}</span>
+                        {isOwner && (
+                            <Button type="button" size="sm" onClick={() => setInviteOpen(true)}>
+                                <UserPlus className="mr-1 h-3.5 w-3.5" />
+                                Invite
+                            </Button>
+                        )}
+                    </div>
+                </div>
                 <p className="text-[11px] text-black/60 font-medium">Managing room access</p>
             </div>
 
@@ -143,7 +155,7 @@ export function MembersPanel({
                         <div className="py-12 text-center text-[10px] uppercase tracking-widest text-white/10 font-bold">Initializing...</div>
                     ) : (
                         members.map((member) => {
-                            const userName = member.user.email?.split("@")[0] || "Anonymous";
+                            const userName = member.user.display_name || "Anonymous";
                             const avatarUrl = member.user.avatar_url;
                             const isCurrentUser = member.user_id === currentUserId;
 
@@ -169,7 +181,7 @@ export function MembersPanel({
                                                 )}
                                             </p>
                                             <p className="text-[10px] text-black/40 truncate font-medium">
-                                                {member.user.email}
+                                                {member.user.display_name}
                                             </p>
                                         </div>
                                     </div>
@@ -218,7 +230,7 @@ export function MembersPanel({
                         <AlertDialogTitle className="text-white font-black uppercase tracking-widest text-lg">Remove Member</AlertDialogTitle>
                         <AlertDialogDescription className="text-white/40 font-medium">
                             Are you sure you want to remove{" "}
-                            <strong className="text-[#a855f7]">{memberToRemove?.user.email}</strong> from this room?
+                            <strong className="text-[#a855f7]">{memberToRemove?.user.display_name}</strong> from this room?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-8 gap-4">
@@ -229,6 +241,12 @@ export function MembersPanel({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <InviteDialog
+                roomId={roomId}
+                open={inviteOpen}
+                onOpenChange={setInviteOpen}
+            />
         </div>
     );
 }

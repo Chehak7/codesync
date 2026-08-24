@@ -6,15 +6,31 @@ import { RealtimeRoomsListener } from "@/components/rooms/RealtimeRoomsListener"
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { revalidatePath } from "next/cache";
 
-export default async function RoomsPage() {
+export default async function RoomsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ invite?: string }>;
+}) {
     try {
         const supabase = await createClient();
         const { data: userData } = await supabase.auth.getUser();
         const user = userData?.user;
 
         if (!user) {
-            redirect("/auth");
+            redirect("/login");
+        }
+
+        const { invite } = await searchParams;
+        if (invite) {
+            const { data: invitedRoomId, error: inviteError } = await supabase
+                .rpc("accept_room_invitation", { p_invitation_token: invite });
+
+            if (!inviteError && invitedRoomId) {
+                revalidatePath("/rooms");
+                redirect(`/room/${invitedRoomId}`);
+            }
         }
 
         // Fetch My Rooms (User is owner or member)
@@ -43,7 +59,7 @@ export default async function RoomsPage() {
 
                 return {
                     ...room,
-                    role: membership?.role as "owner" | "member",
+                    role: membership?.role as "owner" | "editor" | "viewer",
                     participant_count: count
                 };
             });
@@ -63,7 +79,7 @@ export default async function RoomsPage() {
             const count = room.room_members ? (room.room_members[0] as any)?.count : 0;
             return {
                 ...room,
-                role: membership?.role as "owner" | "member",
+                role: membership?.role as "owner" | "editor" | "viewer",
                 participant_count: count
             };
         });

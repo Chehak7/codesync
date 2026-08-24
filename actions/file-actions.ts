@@ -75,6 +75,9 @@ export async function deleteFile(fileId: string, roomId: string) {
     return { success: true };
 }
 
+// Retained for older clients; the collaborative editor persists through Yjs.
+// Both identifiers are bound in the mutation so permission in one room cannot
+// be combined with a file identifier from another room.
 export async function saveFileContent(fileId: string, content: string, roomId: string) {
     const supabase = await createClient();
     const { data: userData } = await supabase.auth.getUser();
@@ -84,22 +87,28 @@ export async function saveFileContent(fileId: string, content: string, roomId: s
         return { error: "Unauthorized" };
     }
 
-    // Check permission
     const hasPermission = await checkPermission(roomId, "editor");
     if (!hasPermission) {
         return { error: "You don't have permission to edit files" };
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from("code_sessions")
         .update({
             code: content,
             updated_at: new Date().toISOString()
         })
-        .eq("id", fileId);
+        .eq("id", fileId)
+        .eq("room_id", roomId)
+        .eq("type", "file")
+        .select("id")
+        .maybeSingle();
 
     if (error) {
         return { error: error.message };
+    }
+    if (!data) {
+        return { error: "File not found in this room" };
     }
 
     return { success: true };

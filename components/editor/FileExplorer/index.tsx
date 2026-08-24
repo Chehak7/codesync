@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FileNode } from '@/types/file-system';
 import { buildFileTree, isValidFileName } from '@/lib/file-utils';
 import { FileTree } from './FileTree';
@@ -38,7 +38,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     const [deleteDialog, setDeleteDialog] = useState(false);
     const [nodeToDelete, setNodeToDelete] = useState<FileNode | null>(null);
 
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     // Load files from Supabase
     const loadFiles = useCallback(async () => {
@@ -81,7 +81,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [roomId, loadFiles, supabase]);
+    }, [loadFiles, roomId, supabase]);
 
     // Build tree and apply search filter
     useEffect(() => {

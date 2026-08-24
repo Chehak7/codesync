@@ -13,7 +13,6 @@ interface PermissionsGuardProps {
 const roleHierarchy: Record<UserRole, number> = {
     owner: 3,
     editor: 2,
-    member: 2,
     viewer: 1
 };
 

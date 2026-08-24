@@ -12,10 +12,8 @@ interface Message {
     user_id: string;
     user: {
         id: string;
-        email?: string;
-        user_metadata?: {
-            avatar_url?: string;
-        };
+        display_name?: string;
+        avatar_url?: string;
     };
 }
 

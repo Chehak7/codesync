@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { RoomEditor } from "@/components/editor/RoomEditor";
-import { SocketProvider } from "@/components/providers/socket-provider";
 import { redirect } from "next/navigation";
 import { fetchMessages } from "@/actions/chat-actions";
 import Link from "next/link";
@@ -59,17 +58,15 @@ export default async function RoomPage({ params }: { params: Promise<{ roomId: s
         }
 
         return (
-            <SocketProvider>
-                <RoomEditor
-                    roomId={roomId}
-                    roomName={room?.name || "Untitled Room"}
-                    initialFiles={files || []}
-                    currentUser={user}
-                    initialMessages={initialMessages}
-                    userRole={member.role}
-                    roomCode={room?.room_code || ""}
-                />
-            </SocketProvider>
+            <RoomEditor
+                roomId={roomId}
+                roomName={room?.name || "Untitled Room"}
+                initialFiles={files || []}
+                currentUser={user}
+                initialMessages={initialMessages}
+                userRole={member.role}
+                roomCode={room?.room_code || ""}
+            />
         );
     } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (error.digest === 'DYNAMIC_SERVER_USAGE' || error.digest?.includes("NEXT_REDIRECT") || error.message?.includes('Dynamic server usage') || error.message === "NEXT_REDIRECT") throw error;

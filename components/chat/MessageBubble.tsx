@@ -24,7 +24,7 @@ interface Message {
     user_id: string;
     user: {
         id: string;
-        email?: string;
+        display_name?: string;
         avatar_url?: string;
     };
 }
@@ -40,7 +40,7 @@ export function MessageBubble({ message, currentUserId }: MessageBubbleProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const isOwn = message.user_id === currentUserId;
-    const userName = message.user.email?.split("@")[0] || "Anonymous";
+    const userName = message.user.display_name || "Anonymous";
     const avatarUrl = message.user.avatar_url;
 
     const handleEdit = async () => {

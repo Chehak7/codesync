@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Copy, LogOut, Trash, Users, Edit } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { deleteRoom, leaveRoom } from "@/actions/room-actions";
+import { deleteRoom, joinPublicRoom, leaveRoom } from "@/actions/room-actions";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { RoomSettingsDialog } from "./RoomSettingsDialog";
 
 interface RoomCardProps {
@@ -29,13 +29,15 @@ interface RoomCardProps {
         created_at: string;
     };
     currentUserId: string;
-    memberRole?: string; // "owner" | "member"
+    memberRole?: "owner" | "editor" | "viewer";
     participantCount: number;
 }
 
-export function RoomCard({ room, currentUserId, participantCount }: RoomCardProps) {
+export function RoomCard({ room, currentUserId, memberRole, participantCount }: RoomCardProps) {
     const isOwner = room.owner_id === currentUserId;
+    const isMember = Boolean(memberRole);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isJoining, startJoining] = useTransition();
 
     const handleCopyCode = () => {
         navigator.clipboard.writeText(room.room_code);
@@ -58,6 +60,13 @@ export function RoomCard({ room, currentUserId, participantCount }: RoomCardProp
         } else {
             toast.success("Left room");
         }
+    };
+
+    const handleJoinPublicRoom = () => {
+        startJoining(async () => {
+            const result = await joinPublicRoom(room.id);
+            if (result?.error) toast.error(result.error);
+        });
     };
 
     return (
@@ -164,9 +173,20 @@ export function RoomCard({ room, currentUserId, participantCount }: RoomCardProp
             </div>
 
             <div className="mt-10 relative z-10">
-                <Button asChild className="w-full bg-white hover:bg-white/90 text-black font-black h-16 rounded-2xl transition-all hover:scale-105 active:scale-95 text-lg shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]">
-                    <Link href={`/room/${room.id}`}>Enter Room</Link>
-                </Button>
+                {isMember ? (
+                    <Button asChild className="w-full bg-white hover:bg-white/90 text-black font-black h-16 rounded-2xl transition-all hover:scale-105 active:scale-95 text-lg shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]">
+                        <Link href={`/room/${room.id}`}>Enter Room</Link>
+                    </Button>
+                ) : (
+                    <Button
+                        type="button"
+                        disabled={isJoining || !room.is_public}
+                        onClick={handleJoinPublicRoom}
+                        className="w-full bg-white hover:bg-white/90 text-black font-black h-16 rounded-2xl transition-all hover:scale-105 active:scale-95 text-lg shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(255,255,255,0.4)]"
+                    >
+                        {isJoining ? "Joining…" : "Join Public Room"}
+                    </Button>
+                )}
             </div>
 
             <RoomSettingsDialog room={room} open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />

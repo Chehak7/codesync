@@ -22,34 +22,44 @@ import {
 import { Copy, Check } from "lucide-react";
 import { UserRole } from "@/actions/permissions-actions";
 import { toast } from "sonner";
+import { createRoomInvite } from "@/actions/room-actions";
 
 interface InviteDialogProps {
     roomId: string;
-    roomCode: string;
+    roomCode?: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-export function InviteDialog({ roomCode, open, onOpenChange }: InviteDialogProps) {
+export function InviteDialog({ roomId, open, onOpenChange }: InviteDialogProps) {
     const [selectedRole, setSelectedRole] = useState<UserRole>("editor");
     const [copied, setCopied] = useState(false);
     const [inviteUrl, setInviteUrl] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
-        // Only access window on client side
-        if (typeof window !== 'undefined') {
-            setInviteUrl(`${window.location.origin}/rooms?join=${roomCode}`);
-        }
-    }, [roomCode]);
+        setInviteUrl("");
+        setCopied(false);
+    }, [roomId, selectedRole]);
 
     const handleCopy = async () => {
+        setIsGenerating(true);
         try {
-            await navigator.clipboard.writeText(inviteUrl);
+            const result = await createRoomInvite(roomId, selectedRole as "editor" | "viewer");
+            if (result.error || !result.data) {
+                toast.error(result.error || "Unable to create invitation");
+                return;
+            }
+            const url = `${window.location.origin}/rooms?invite=${encodeURIComponent(result.data.token)}`;
+            setInviteUrl(url);
+            await navigator.clipboard.writeText(url);
             setCopied(true);
-            toast.success("Invite link copied to clipboard");
+            toast.success(`${selectedRole === "editor" ? "Editor" : "Viewer"} invite copied`);
             setTimeout(() => setCopied(false), 2000);
         } catch {
             toast.error("Failed to copy link");
+        } finally {
+            setIsGenerating(false);
         }
     };
 
@@ -93,6 +103,7 @@ export function InviteDialog({ roomCode, open, onOpenChange }: InviteDialogProps
                                 variant="outline"
                                 size="icon"
                                 onClick={handleCopy}
+                                disabled={isGenerating}
                             >
                                 {copied ? (
                                     <Check className="h-4 w-4" />
@@ -103,18 +114,6 @@ export function InviteDialog({ roomCode, open, onOpenChange }: InviteDialogProps
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="room-code">Room Code</Label>
-                        <Input
-                            id="room-code"
-                            value={roomCode}
-                            readOnly
-                            className="font-mono text-lg text-center"
-                        />
-                        <p className="text-sm text-muted-foreground">
-                            Users can also join using this code
-                        </p>
-                    </div>
                 </div>
 
                 <DialogFooter>

@@ -7,8 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Send, Smile } from "lucide-react";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { sendMessage } from "@/actions/chat-actions";
+import { createClient } from "@/lib/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { useSocket } from "@/components/providers/socket-provider";
 
 interface MessageInputProps {
     roomId: string;
@@ -19,8 +20,40 @@ export function MessageInput({ roomId }: MessageInputProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEmojiOpen, setIsEmojiOpen] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const { socket } = useSocket();
-    const typingTimeoutRef = useRef<NodeJS.Timeout>();
+    const typingChannelRef = useRef<RealtimeChannel | null>(null);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const typingActiveRef = useRef(false);
+    const typingClientIdRef = useRef(crypto.randomUUID());
+
+    useEffect(() => {
+        const supabase = createClient();
+        const channel = supabase.channel(`room:${roomId}:messages`, {
+            config: {
+                private: true,
+                broadcast: { ack: true, self: false },
+            },
+        });
+
+        void supabase.realtime.setAuth();
+        channel.subscribe((status: string) => {
+            if (status === "SUBSCRIBED") {
+                typingChannelRef.current = channel;
+            }
+        });
+
+        return () => {
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            if (typingActiveRef.current) {
+                void channel.send({
+                    type: "broadcast",
+                    event: "stop-typing",
+                    payload: { clientId: typingClientIdRef.current },
+                });
+            }
+            typingChannelRef.current = null;
+            supabase.removeChannel(channel);
+        };
+    }, [roomId]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -30,20 +63,38 @@ export function MessageInput({ roomId }: MessageInputProps) {
         }
     }, [message]);
 
-    const handleTyping = () => {
-        if (socket) {
-            socket.emit("typing", { roomId });
-
-            // Clear previous timeout
-            if (typingTimeoutRef.current) {
-                clearTimeout(typingTimeoutRef.current);
-            }
-
-            // Stop typing after 2 seconds of inactivity
-            typingTimeoutRef.current = setTimeout(() => {
-                socket.emit("stop-typing", { roomId });
-            }, 2000);
+    const stopTyping = () => {
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
         }
+
+        if (!typingActiveRef.current) return;
+        typingActiveRef.current = false;
+        void typingChannelRef.current?.send({
+            type: "broadcast",
+            event: "stop-typing",
+            payload: { clientId: typingClientIdRef.current },
+        });
+    };
+
+    const handleTyping = (value: string) => {
+        if (!value.trim()) {
+            stopTyping();
+            return;
+        }
+
+        if (!typingActiveRef.current && typingChannelRef.current) {
+            typingActiveRef.current = true;
+            void typingChannelRef.current.send({
+                type: "broadcast",
+                event: "typing",
+                payload: { clientId: typingClientIdRef.current },
+            });
+        }
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(stopTyping, 2000);
     };
 
     const handleSend = async () => {
@@ -57,9 +108,7 @@ export function MessageInput({ roomId }: MessageInputProps) {
             toast.error(result.error);
         } else {
             setMessage("");
-            if (socket) {
-                socket.emit("stop-typing", { roomId });
-            }
+            stopTyping();
         }
     };
 
@@ -94,7 +143,7 @@ export function MessageInput({ roomId }: MessageInputProps) {
                 value={message}
                 onChange={(e) => {
                     setMessage(e.target.value);
-                    handleTyping();
+                    handleTyping(e.target.value);
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."

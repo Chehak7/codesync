@@ -23,12 +23,6 @@ export function RoleBadge({ role, showIcon = true }: RoleBadgeProps) {
             className: "bg-blue-500 hover:bg-blue-600 text-white",
             icon: Edit
         },
-        member: {
-            label: "Member",
-            variant: "default" as const,
-            className: "bg-blue-500 hover:bg-blue-600 text-white",
-            icon: Edit
-        },
         viewer: {
             label: "Viewer",
             variant: "secondary" as const,

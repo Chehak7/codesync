@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-export type UserRole = "owner" | "editor" | "viewer" | "member";
+export type UserRole = "owner" | "editor" | "viewer";
 
 export async function getUserRole(roomId: string): Promise<{ role: UserRole | null; error?: string }> {
     const supabase = await createClient();
@@ -56,7 +56,7 @@ export async function getRoomMembers(roomId: string) {
             user_id,
             role,
             joined_at,
-            user:profiles(id, email, avatar_url)
+            user:profiles(id, display_name, avatar_url)
         `)
         .eq("room_id", roomId)
         .order("joined_at", { ascending: true }) as any;
@@ -200,7 +200,6 @@ export async function checkPermission(roomId: string, requiredRole: UserRole): P
     const roleHierarchy: Record<UserRole, number> = {
         owner: 3,
         editor: 2,
-        member: 2,
         viewer: 1
     };
 

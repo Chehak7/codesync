@@ -16,7 +16,7 @@ interface Message {
     user_id: string;
     user: {
         id: string;
-        email?: string;
+        display_name?: string;
         avatar_url?: string;
     };
 }
@@ -31,7 +31,9 @@ export function MessageList({ roomId, currentUserId, initialMessages }: MessageL
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(initialMessages.length === 50);
+    const [typingClientIds, setTypingClientIds] = useState<string[]>([]);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const typingTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
     const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
 
     // Auto-scroll to bottom
@@ -54,8 +56,36 @@ export function MessageList({ roomId, currentUserId, initialMessages }: MessageL
     useEffect(() => {
         const supabase = createClient();
 
+        const removeTypingClient = (clientId: string) => {
+            const timeout = typingTimeoutsRef.current.get(clientId);
+            if (timeout) clearTimeout(timeout);
+            typingTimeoutsRef.current.delete(clientId);
+            setTypingClientIds((previous) => previous.filter((id) => id !== clientId));
+        };
+
         const channel = supabase
-            .channel(`room:${roomId}:messages`)
+            .channel(`room:${roomId}:messages`, {
+                config: { private: true },
+            })
+            .on("broadcast", { event: "typing" }, ({ payload }: { payload?: { clientId?: unknown } }) => {
+                const clientId = payload?.clientId;
+                if (typeof clientId !== "string" || clientId.length > 100) return;
+
+                setTypingClientIds((previous) =>
+                    previous.includes(clientId) ? previous : [...previous, clientId]
+                );
+
+                const existingTimeout = typingTimeoutsRef.current.get(clientId);
+                if (existingTimeout) clearTimeout(existingTimeout);
+                typingTimeoutsRef.current.set(
+                    clientId,
+                    setTimeout(() => removeTypingClient(clientId), 4000)
+                );
+            })
+            .on("broadcast", { event: "stop-typing" }, ({ payload }: { payload?: { clientId?: unknown } }) => {
+                const clientId = payload?.clientId;
+                if (typeof clientId === "string") removeTypingClient(clientId);
+            })
             .on(
                 "postgres_changes",
                 {
@@ -71,7 +101,7 @@ export function MessageList({ roomId, currentUserId, initialMessages }: MessageL
                         .from("messages")
                         .select(`
                             *,
-                            user:profiles(id, email, avatar_url)
+                            user:profiles(id, display_name, avatar_url)
                         `)
                         .eq("id", payload.new.id)
                         .single();
@@ -92,6 +122,11 @@ export function MessageList({ roomId, currentUserId, initialMessages }: MessageL
                 },
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (payload: any) => {
+                    if (payload.new.deleted_at) {
+                        setMessages((prev) => prev.filter((msg) => msg.id !== payload.new.id));
+                        return;
+                    }
+
                     setMessages((prev) =>
                         prev.map((msg) =>
                             msg.id === payload.new.id
@@ -116,7 +151,11 @@ export function MessageList({ roomId, currentUserId, initialMessages }: MessageL
             )
             .subscribe();
 
+        void supabase.realtime.setAuth();
+
         return () => {
+            for (const timeout of typingTimeoutsRef.current.values()) clearTimeout(timeout);
+            typingTimeoutsRef.current.clear();
             supabase.removeChannel(channel);
         };
     }, [roomId]);
@@ -165,6 +204,13 @@ export function MessageList({ roomId, currentUserId, initialMessages }: MessageL
                             currentUserId={currentUserId}
                         />
                     ))}
+                    {typingClientIds.length > 0 && (
+                        <p className="text-xs text-muted-foreground" aria-live="polite">
+                            {typingClientIds.length === 1
+                                ? "Someone is typing…"
+                                : `${typingClientIds.length} people are typing…`}
+                        </p>
+                    )}
                 </div>
             </ScrollArea>
         </div>

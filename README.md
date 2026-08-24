@@ -39,6 +39,8 @@ Check out the live deployment here:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_project_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+   # Exact public origin used for server-side authentication redirects.
+   APP_ORIGIN=http://localhost:3000
    ```
 
 3. **Run**
